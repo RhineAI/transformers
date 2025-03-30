@@ -26,9 +26,15 @@ def sdpa_attention_forward(
     is_causal: Optional[bool] = None,
     **kwargs,
 ) -> Tuple[torch.Tensor, None]:
+
+    # query_states: [batch_size, num_attention_heads, sequence_length, head_dim]  [1, 14, 20, 64]
+    # kv_states: [batch_size, num_key_value_heads, sequence_length, head_dim]  [1, 2, 20, 64]
+
     if hasattr(module, "num_key_value_groups"):
         key = repeat_kv(key, module.num_key_value_groups)
         value = repeat_kv(value, module.num_key_value_groups)
+
+    # qkv_repeated_states: [batch_size, num_attention_heads, sequence_length, head_dim]  [1, 14, 20, 64]
 
     causal_mask = attention_mask
     if attention_mask is not None:

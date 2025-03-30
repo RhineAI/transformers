@@ -114,8 +114,12 @@ def eager_attention_forward(
     dropout: float = 0.0,
     **kwargs,
 ):
+    # states: [batch_size, num_attention_heads, sequence_length, head_dim]  [1, 14, 20, 64]
+
     key_states = repeat_kv(key, module.num_key_value_groups)
     value_states = repeat_kv(value, module.num_key_value_groups)
+
+    print(key_states.shape)
 
     attn_weights = torch.matmul(query, key_states.transpose(2, 3)) * scaling
     if attention_mask is not None:
@@ -162,6 +166,17 @@ class Qwen2Attention(nn.Module):
         query_states = self.q_proj(hidden_states).view(hidden_shape).transpose(1, 2)
         key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)
         value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+
+        # print('query_states.shape:', query_states.shape)
+        # print('key_states.shape:', key_states.shape)
+        # print('value_states.shape:', value_states.shape)
+
+        # num_attention_heads * head_dim = hidden_size
+        # num_key_value_groups = num_key_value_heads
+        # num_attention_heads_each_group = num_attention_heads / num_key_value_groups
+
+        # query_states: [batch_size, num_attention_heads, sequence_length, head_dim]  [1, 14, 20, 64]
+        # kv_states: [batch_size, num_key_value_heads, sequence_length, head_dim]  [1, 2, 20, 64]
 
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
@@ -230,9 +245,9 @@ class Qwen2DecoderLayer(nn.Module):
     def __init__(self, config: Qwen2Config, layer_idx: int):
         super().__init__()
         self.hidden_size = config.hidden_size
+        self.input_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.self_attn = Qwen2Attention(config=config, layer_idx=layer_idx)
         self.mlp = Qwen2MLP(config)
-        self.input_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         if config.sliding_window and config._attn_implementation != "flash_attention_2":
             logger.warning_once(
@@ -530,6 +545,9 @@ class Qwen2Model(Qwen2PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
+        print('input_ids:', input_ids.shape, input_ids)
+        print('inputs_embeds:', inputs_embeds.shape, inputs_embeds)
+
         if use_cache and past_key_values is None:
             past_key_values = DynamicCache()
 
@@ -554,6 +572,8 @@ class Qwen2Model(Qwen2PreTrainedModel):
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
+
+        print(self.layers)
 
         for decoder_layer in self.layers[: self.config.num_hidden_layers]:
             if output_hidden_states:
@@ -601,6 +621,7 @@ class Qwen2Model(Qwen2PreTrainedModel):
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
         )
+        print('output:', output)
         return output if return_dict else output.to_tuple()
 
     def _update_causal_mask(
@@ -866,6 +887,9 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel, GenerationMixin):
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
         logits = self.lm_head(hidden_states[:, slice_indices, :])
+
+        print('hidden_states:', hidden_states.shape, hidden_states)
+        print('logits:', logits.shape, logits)
 
         loss = None
         if labels is not None:
