@@ -43,9 +43,10 @@ _CONFIG_FOR_DOC = "Qwen2Config"
 
 
 class Qwen2MLP(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, record_prefix: Optional[str] = None):
         super().__init__()
         self.config = config
+        self.record_prefix = record_prefix
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
@@ -53,8 +54,20 @@ class Qwen2MLP(nn.Module):
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
         self.act_fn = ACT2FN[config.hidden_act]
 
-    def forward(self, x):
-        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+    def forward(self, x, record_dict: Optional[dict] = None):
+        up_proj = self.up_proj(x)
+        gate_proj = self.gate_proj(x)
+        activated_gate_proj = self.act_fn(gate_proj)
+        gated_up_proj = activated_gate_proj * up_proj
+        down_proj = self.down_proj(gated_up_proj)
+
+        if record_dict is not None:
+            record_dict[self.record_prefix + '.up_proj'] = up_proj.clone()
+            record_dict[self.record_prefix + '.gate_proj'] = gate_proj.clone()
+            record_dict[self.record_prefix + '.activated_gate_proj'] = activated_gate_proj.clone()
+            record_dict[self.record_prefix + '.gated_up_proj'] = gated_up_proj.clone()
+            record_dict[self.record_prefix + '.down_proj'] = down_proj.clone()
+
         return down_proj
 
 
@@ -137,10 +150,11 @@ def eager_attention_forward(
 class Qwen2Attention(nn.Module):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: Qwen2Config, layer_idx: int):
+    def __init__(self, config: Qwen2Config, layer_idx: int, record_prefix: Optional[str] = None):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
+        self.record_prefix = record_prefix
         self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
         self.scaling = self.head_dim**-0.5
@@ -158,6 +172,7 @@ class Qwen2Attention(nn.Module):
         attention_mask: Optional[torch.Tensor],
         past_key_value: Optional[Cache] = None,
         cache_position: Optional[torch.LongTensor] = None,
+        record_dict: Optional[dict] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         input_shape = hidden_states.shape[:-1]
@@ -213,11 +228,21 @@ class Qwen2Attention(nn.Module):
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
             sliding_window=sliding_window,  # main diff with Llama
+            record_dict=record_dict,
+            record_prefix=self.record_prefix,
             **kwargs,
         )
 
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+
+        if record_dict is not None:
+            record_dict[self.record_prefix + '.sdpa'] = attn_output.clone()
+
         attn_output = self.o_proj(attn_output)
+
+        if record_dict is not None:
+            record_dict[self.record_prefix + '.o_proj'] = attn_output.clone()
+
         return attn_output, attn_weights
 
 
@@ -244,10 +269,12 @@ class Qwen2RMSNorm(nn.Module):
 class Qwen2DecoderLayer(nn.Module):
     def __init__(self, config: Qwen2Config, layer_idx: int):
         super().__init__()
+        self.layer_idx = layer_idx
+        self.record_prefix = f'state.layers.{self.layer_idx}'
         self.hidden_size = config.hidden_size
         self.input_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.self_attn = Qwen2Attention(config=config, layer_idx=layer_idx)
-        self.mlp = Qwen2MLP(config)
+        self.self_attn = Qwen2Attention(config=config, layer_idx=layer_idx, record_prefix=self.record_prefix + '.self_attn')
+        self.mlp = Qwen2MLP(config, record_prefix=self.record_prefix + '.mlp')
         self.post_attention_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         if config.sliding_window and config._attn_implementation != "flash_attention_2":
             logger.warning_once(
@@ -265,11 +292,15 @@ class Qwen2DecoderLayer(nn.Module):
         use_cache: Optional[bool] = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        record_dict: Optional[dict] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
+
+        if record_dict is not None:
+            record_dict[self.record_prefix + '.input_layernorm'] = hidden_states.clone()
 
         # Self Attention
         hidden_states, self_attn_weights = self.self_attn(
@@ -281,6 +312,7 @@ class Qwen2DecoderLayer(nn.Module):
             use_cache=use_cache,
             cache_position=cache_position,
             position_embeddings=position_embeddings,
+            record_dict=record_dict,
             **kwargs,
         )
         hidden_states = residual + hidden_states
@@ -288,7 +320,11 @@ class Qwen2DecoderLayer(nn.Module):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
+
+        if record_dict is not None:
+            record_dict[self.record_prefix + '.post_attention_layernorm'] = hidden_states.clone()
+
+        hidden_states = self.mlp(hidden_states, record_dict=record_dict)
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
@@ -520,6 +556,7 @@ class Qwen2Model(Qwen2PreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
+        record_dict: Optional[dict] = None,
         **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -545,8 +582,12 @@ class Qwen2Model(Qwen2PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-        print('input_ids:', input_ids.shape, input_ids)
-        print('inputs_embeds:', inputs_embeds.shape, inputs_embeds)
+        # print('input_ids:', input_ids.shape, input_ids)
+        # print('inputs_embeds:', inputs_embeds.shape, inputs_embeds)
+
+        if record_dict is not None:
+            record_dict['state.token_ids'] = input_ids.clone()
+            record_dict['state.embed_tokens'] = inputs_embeds.clone()
 
         if use_cache and past_key_values is None:
             past_key_values = DynamicCache()
@@ -573,7 +614,7 @@ class Qwen2Model(Qwen2PreTrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
 
-        print(self.layers)
+        # print(self.layers)
 
         for decoder_layer in self.layers[: self.config.num_hidden_layers]:
             if output_hidden_states:
@@ -601,6 +642,7 @@ class Qwen2Model(Qwen2PreTrainedModel):
                     use_cache=use_cache,
                     cache_position=cache_position,
                     position_embeddings=position_embeddings,
+                    record_dict=record_dict,
                     **flash_attn_kwargs,
                 )
 
@@ -610,6 +652,10 @@ class Qwen2Model(Qwen2PreTrainedModel):
                 all_self_attns += (layer_outputs[1],)
 
         hidden_states = self.norm(hidden_states)
+
+        if record_dict is not None:
+            record_dict['state.final_norm'] = hidden_states.clone()
+
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
@@ -621,7 +667,7 @@ class Qwen2Model(Qwen2PreTrainedModel):
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
         )
-        print('output:', output)
+        # print('output:', output)
         return output if return_dict else output.to_tuple()
 
     def _update_causal_mask(
@@ -829,6 +875,7 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel, GenerationMixin):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         logits_to_keep: Union[int, torch.Tensor] = 0,
+        record_dict: Optional[dict] = None,
         **kwargs: Unpack[KwargsForCausalLM],
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
@@ -880,6 +927,7 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel, GenerationMixin):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
             cache_position=cache_position,
+            record_dict=record_dict,
             **kwargs,
         )
 
@@ -888,8 +936,17 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel, GenerationMixin):
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
         logits = self.lm_head(hidden_states[:, slice_indices, :])
 
-        print('hidden_states:', hidden_states.shape, hidden_states)
-        print('logits:', logits.shape, logits)
+        if record_dict is not None:
+            record_dict['state.logits'] = logits.clone()
+
+            last_logits = logits[:, -1, :]
+            record_dict['state.last_logits'] = last_logits
+
+            next_token_id = last_logits.argmax(dim=-1)
+            record_dict['state.next_token_id'] = next_token_id
+
+        # print('hidden_states:', hidden_states.shape, hidden_states)
+        # print('logits:', logits.shape, logits)
 
         loss = None
         if labels is not None:

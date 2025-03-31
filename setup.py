@@ -393,6 +393,26 @@ extras["dev-torch"] = (
     + extras["onnxruntime"]
     + extras["num2words"]
 )
+
+# pip install -e ".[dev-torch-without-speech-and-audio]"
+extras["dev-torch-without-speech-and-audio"] = (
+    extras["testing"]
+    + extras["torch"]
+    + extras["sentencepiece"]
+    + extras["tokenizers"]
+    + extras["vision"]
+    + extras["integrations"]
+    + extras["timm"]
+    + extras["torch-vision"]
+    + extras["codecarbon"]
+    + extras["quality"]
+    + extras["ja"]
+    + extras["sklearn"]
+    + extras["modelcreation"]
+    + extras["onnxruntime"]
+    + extras["num2words"]
+)
+
 extras["dev-tensorflow"] = (
     extras["testing"]
     + extras["tf"]

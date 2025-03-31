@@ -24,6 +24,8 @@ def sdpa_attention_forward(
     dropout: float = 0.0,
     scaling: Optional[float] = None,
     is_causal: Optional[bool] = None,
+    record_dict: Optional[dict] = None,
+    record_prefix: Optional[str] = None,
     **kwargs,
 ) -> Tuple[torch.Tensor, None]:
 
