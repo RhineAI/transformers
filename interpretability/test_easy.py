@@ -3,13 +3,14 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from safetensors.torch import save_file
 import os
 
-user_prompt = '直接给出最终答案，一个数字。16+28='
-messages = [
-    {"role": "system", "content": 'You are a helpful assistant.'},
-    {"role": "user", "content": user_prompt}
-]
+text = '''<|im_start|>system
+You are a helpful assistant.<|im_end|>
+<|im_start|>user
+直接给出最终答案，一个数字。16+28=<|im_end|>
+<|im_start|>assistant
+44'''
 
-print(f'[Initialize] Start at: {time.strftime("%H:%M:%S", time.localtime())}')
+saved_path = '/data/guohaoran/guohaoran/transformers/interpretability/record/3'
 
 model_path = "/data/disk1/guohaoran/models/Qwen2.5-0.5B-Instruct"
 model = AutoModelForCausalLM.from_pretrained(
@@ -18,11 +19,6 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
-text = tokenizer.apply_chat_template(
-    messages,
-    tokenize=False,
-    add_generation_prompt=True
-)
 print('text:', text)
 inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
@@ -48,7 +44,6 @@ for k, v in record_dict.items():
     lines.append(k + ': ' + str(list(v.shape)))
 print('\n'.join(lines[:13]) + '\n\n...\n\n' + '\n'.join(lines[-15:]))
 
-saved_path = '/data/guohaoran/guohaoran/transformers/interpretability/record/2'
 os.makedirs(saved_path, exist_ok=True)
 save_file(record_dict, os.path.join(saved_path, 'state.safetensors'))
 print('\nSaved to:', saved_path)

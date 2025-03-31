@@ -942,8 +942,8 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel, GenerationMixin):
             last_logits = logits[:, -1, :]
             record_dict['state.last_logits'] = last_logits
 
-            next_token_id = last_logits.argmax(dim=-1)
-            record_dict['state.next_token_id'] = next_token_id
+            # next_token_id = last_logits.argmax(dim=-1)
+            # record_dict['state.next_token_id'] = next_token_id
 
         # print('hidden_states:', hidden_states.shape, hidden_states)
         # print('logits:', logits.shape, logits)

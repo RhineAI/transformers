@@ -2,8 +2,10 @@ import time
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextStreamer
 
 
+user_prompt = '直接给出最终答案，一个数字。16+28='
 messages = [
-  {"role": "user", "content": '16+28='}
+    {"role": "system", "content": 'You are a helpful assistant.'},
+    {"role": "user", "content": user_prompt}
 ]
 
 start_time = time.time()
@@ -50,7 +52,4 @@ tpm = total_new_tokens / (generate_duration / 60)
 print(f"\n[Status] Generation completed in {generate_duration:.2f}s")
 print(f"[Metric] TPM: {tpm:.0f} | Tokens: {total_new_tokens}")
 print(f"[Total] Duration: {time.time() - start_time:.2f}s")
-
-
-
 

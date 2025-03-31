@@ -8,3 +8,4 @@ print(state_dict.keys())
 embed_tokens_weight = state_dict["model.embed_tokens.weight"]
 print(embed_tokens_weight.shape)
 print(embed_tokens_weight)
+
