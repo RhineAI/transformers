@@ -36,7 +36,7 @@ result = model(
 )
 # print('result:', result)
 
-logits = result.logits
+logits = result.logits  # [33, 151936]
 next_token_id = logits[:, -1, :].argmax(dim=-1).item()
 print('next_token_id:', next_token_id)
 next_token = tokenizer.decode([next_token_id], skip_special_tokens=True)
@@ -48,7 +48,7 @@ for k, v in record_dict.items():
     lines.append(k + ': ' + str(list(v.shape)))
 print('\n'.join(lines[:13]) + '\n\n...\n\n' + '\n'.join(lines[-15:]))
 
-saved_path = '/data/guohaoran/guohaoran/transformers/interpretability/record/2'
+saved_path = '/data/guohaoran/guohaoran/transformers/interpretability/record/0'
 os.makedirs(saved_path, exist_ok=True)
 save_file(record_dict, os.path.join(saved_path, 'state.safetensors'))
 print('\nSaved to:', saved_path)

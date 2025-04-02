@@ -1,0 +1,14 @@
+{
+  "tasks": [
+    {
+      "task": "head",
+      "state": "state.final_norm",
+      "weight": "model.embed_tokens.weight"
+    },
+    {
+      "task": "norm",
+      "state": "state.layers.23.mlp.down_proj",
+      "weight": "model.norm.weight"
+    }
+  ]
+}
