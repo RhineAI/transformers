@@ -39,7 +39,7 @@ def sdpa_attention_forward(
     # qkv_repeated_states: [batch_size, num_attention_heads, sequence_length, head_dim]  [1, 14, 20, 64]
 
     causal_mask = attention_mask
-    if attention_mask is not None:
+    if attention_mask is not None and causal_mask.ndim == 4:
         causal_mask = causal_mask[:, :, :, : key.shape[-2]]
 
     # SDPA with memory-efficient backend is bugged with non-contiguous inputs and custom attn_mask for some torch versions
