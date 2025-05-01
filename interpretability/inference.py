@@ -1,5 +1,4 @@
 import time
-import sys
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextStreamer
 
 user_prompt = '直接给出最终答案，禁止出现原来的式子。36+12='
@@ -24,7 +23,8 @@ text = tokenizer.apply_chat_template(
     enable_thinking=False,
     add_generation_prompt=True,
 )
-print('text:', text)
+print('\n[Templated]')
+print(text.strip())
 inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
 print("\n[Inference]")

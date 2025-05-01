@@ -3,7 +3,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from safetensors.torch import save_file
 import os
 
-user_prompt = '直接给出最终答案，一个数字。16+28='
+user_prompt = '直接给出最终答案，禁止出现原来的式子。36+12='
 messages = [
     {"role": "system", "content": 'You are a helpful assistant.'},
     {"role": "user", "content": user_prompt}
@@ -11,19 +11,23 @@ messages = [
 
 print(f'[Initialize] Start at: {time.strftime("%H:%M:%S", time.localtime())}')
 
-model_path = "/data/disk1/guohaoran/models/Qwen2.5-0.5B-Instruct"
+model_path = "/data/disk1/guohaoran/models/Qwen3-0.6B"
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
     device_map='cuda:0',
 )
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
+print(model)
+
 text = tokenizer.apply_chat_template(
     messages,
+    enable_thinking=False,
     tokenize=False,
     add_generation_prompt=True
 )
-print('text:', text)
+print('\n[Templated]')
+print(text.strip())
 inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
 print("[Inference]")
@@ -46,9 +50,10 @@ print('\n[Record Dict]')
 lines = []
 for k, v in record_dict.items():
     lines.append(k + ': ' + str(list(v.shape)))
-print('\n'.join(lines[:13]) + '\n\n...\n\n' + '\n'.join(lines[-15:]))
-
-saved_path = '/data/guohaoran/guohaoran/transformers/interpretability/record/0'
-os.makedirs(saved_path, exist_ok=True)
-save_file(record_dict, os.path.join(saved_path, 'state.safetensors'))
-print('\nSaved to:', saved_path)
+print('.'.join(lines))
+# print('\n'.join(lines[:13]) + '\n\n...\n\n' + '\n'.join(lines[-15:]))
+#
+# saved_path = '/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0'
+# os.makedirs(saved_path, exist_ok=True)
+# save_file(record_dict, os.path.join(saved_path, 'state.safetensors'))
+# print('\nSaved to:', saved_path)
