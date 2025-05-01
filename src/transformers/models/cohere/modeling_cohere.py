@@ -42,6 +42,7 @@ from ...modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from ...modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
 from ...modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from ...processing_utils import Unpack
+from ...record.record_service import RecordService
 from ...utils import (
     LossKwargs,
     add_start_docstrings,
@@ -128,7 +129,17 @@ class CohereMLP(nn.Module):
         self.act_fn = ACT2FN[config.hidden_act]
 
     def forward(self, x):
-        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        record_service = RecordService()
+        record_service.set("model.layers.LAYER_INDEX.mlp.input", x)
+        pre = self.gate_proj(x)
+        record_service.set("model.layers.LAYER_INDEX.mlp.pre", pre)
+        activated = self.act_fn(pre)
+        record_service.set("model.layers.LAYER_INDEX.mlp.activated", activated)
+        upped = self.up_proj(x)
+        record_service.set("model.layers.LAYER_INDEX.mlp.upped", upped)
+        gated = activated * upped
+        record_service.set("model.layers.LAYER_INDEX.mlp.gated", gated)
+        down_proj = self.down_proj(gated)
         return down_proj
 
 
@@ -538,6 +549,8 @@ class CohereModel(CoherePreTrainedModel):
         cache_position: Optional[torch.LongTensor] = None,
         **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
     ) -> BaseModelOutputWithPast:
+        record_service = RecordService()
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -558,6 +571,7 @@ class CohereModel(CoherePreTrainedModel):
             raise ValueError("The `past_key_values` should be either a `Cache` object or `None`.")
 
         if inputs_embeds is None:
+            record_service.set("model.embed_tokens.input", input_ids)
             inputs_embeds = self.embed_tokens(input_ids)
 
         if use_cache and past_key_values is None:
@@ -585,7 +599,10 @@ class CohereModel(CoherePreTrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
 
+        layer_index = 0
         for decoder_layer in self.layers[: self.config.num_hidden_layers]:
+            record_service.current_layer_index = layer_index
+
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -605,6 +622,8 @@ class CohereModel(CoherePreTrainedModel):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
+
+            layer_index += 1
 
         hidden_states = self.norm(hidden_states)
 

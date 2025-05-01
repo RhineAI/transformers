@@ -35,6 +35,7 @@ from ...modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from ...modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
 from ...modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from ...processing_utils import Unpack
+from ...record.record_service import RecordService
 from ...utils import (
     LossKwargs,
     add_start_docstrings,
@@ -164,13 +165,18 @@ class GraniteAttention(nn.Module):
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+        record_service = RecordService()
+
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self.head_dim)
 
+        record_service.set("model.layers.LAYER_INDEX.self_attn.input", hidden_states)
         query_states = self.q_proj(hidden_states).view(hidden_shape).transpose(1, 2)
         key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)
         value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
 
+        record_service.set("model.layers.LAYER_INDEX.self_attn.rotary_pos_emb.input.query", query_states)
+        record_service.set("model.layers.LAYER_INDEX.self_attn.rotary_pos_emb.input.key", key_states)
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
@@ -190,6 +196,9 @@ class GraniteAttention(nn.Module):
             else:
                 attention_interface = ALL_ATTENTION_FUNCTIONS[self.config._attn_implementation]
 
+        record_service.set("model.layers.LAYER_INDEX.self_attn.sdpa.input.query", query_states)
+        record_service.set("model.layers.LAYER_INDEX.self_attn.sdpa.input.key", key_states)
+        record_service.set("model.layers.LAYER_INDEX.self_attn.sdpa.input.value", value_states)
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -202,6 +211,7 @@ class GraniteAttention(nn.Module):
         )
 
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
+        record_service.set("model.layers.LAYER_INDEX.self_attn.output.input", value_states)
         attn_output = self.o_proj(attn_output)
         return attn_output, attn_weights
 
@@ -239,7 +249,17 @@ class GraniteMLP(nn.Module):
         self.act_fn = ACT2FN[config.hidden_act]
 
     def forward(self, x):
-        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        record_service = RecordService()
+        record_service.set("model.layers.LAYER_INDEX.mlp.input", x)
+        pre = self.gate_proj(x)
+        record_service.set("model.layers.LAYER_INDEX.mlp.pre", pre)
+        activated = self.act_fn(pre)
+        record_service.set("model.layers.LAYER_INDEX.mlp.activated", activated)
+        upped = self.up_proj(x)
+        record_service.set("model.layers.LAYER_INDEX.mlp.upped", upped)
+        gated = activated * upped
+        record_service.set("model.layers.LAYER_INDEX.mlp.gated", gated)
+        down_proj = self.down_proj(gated)
         return down_proj
 
 

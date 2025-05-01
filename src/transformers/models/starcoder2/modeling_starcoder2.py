@@ -44,6 +44,7 @@ from ...modeling_outputs import (
 from ...modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
 from ...modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from ...processing_utils import Unpack
+from ...record.record_service import RecordService
 from ...utils import (
     LossKwargs,
     add_code_sample_docstrings,
@@ -252,7 +253,10 @@ class Starcoder2DecoderLayer(GradientCheckpointingLayer):
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+        record_service = RecordService()
+
         residual = hidden_states
+        record_service.set("model.layers.LAYER_INDEX.input_layernorm.input", hidden_states)
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
@@ -271,6 +275,7 @@ class Starcoder2DecoderLayer(GradientCheckpointingLayer):
 
         # Fully Connected
         residual = hidden_states
+        record_service.set("model.layers.LAYER_INDEX.post_attention_layernorm.input", hidden_states)
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states

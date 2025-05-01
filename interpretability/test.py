@@ -20,7 +20,7 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
-print(model)
+# print(model)
 
 text = tokenizer.apply_chat_template(
     messages,
@@ -29,10 +29,10 @@ text = tokenizer.apply_chat_template(
     add_generation_prompt=True
 )
 print('\n[Templated]')
-print(text.strip())
+print(text.strip().replace('\n\n', '\n'))
 inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
-print("[Inference]")
+print("\n[Inference]")
 record_service = RecordService()
 record_service.reset()
 
@@ -53,7 +53,7 @@ print('\n[Record]')
 lines = []
 for k, v in record_service.state.items():
     lines.append(k + ': ' + str(list(v.shape)))
-print('.'.join(lines))
+print('\n'.join(lines))
 # print('\n'.join(lines[:13]) + '\n\n...\n\n' + '\n'.join(lines[-15:]))
 #
 # saved_path = '/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0'

@@ -36,6 +36,7 @@ from ...modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast,
 from ...modeling_rope_utils import ROPE_INIT_FUNCTIONS, dynamic_rope_update
 from ...modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from ...processing_utils import Unpack
+from ...record.record_service import RecordService
 from ...utils import (
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
@@ -125,7 +126,17 @@ class Gemma3MLP(nn.Module):
         self.act_fn = ACT2FN[config.hidden_activation]
 
     def forward(self, x):
-        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        record_service = RecordService()
+        record_service.set("model.layers.LAYER_INDEX.mlp.input", x)
+        pre = self.gate_proj(x)
+        record_service.set("model.layers.LAYER_INDEX.mlp.pre", pre)
+        activated = self.act_fn(pre)
+        record_service.set("model.layers.LAYER_INDEX.mlp.activated", activated)
+        upped = self.up_proj(x)
+        record_service.set("model.layers.LAYER_INDEX.mlp.upped", upped)
+        gated = activated * upped
+        record_service.set("model.layers.LAYER_INDEX.mlp.gated", gated)
+        down_proj = self.down_proj(gated)
         return down_proj
 
 
