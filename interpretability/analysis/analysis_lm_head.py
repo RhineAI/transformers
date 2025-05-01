@@ -2,7 +2,7 @@ import torch
 from safetensors.torch import load_file
 
 model_dict = load_file('/data/disk1/guohaoran/models/Qwen2.5-0.5B-Instruct/model.safetensors')
-state_dict = load_file('/data/guohaoran/guohaoran/transformers/interpretability/record/0/state.safetensors')
+state_dict = load_file('/data/disk1/guohaoran/transformers/interpretability/record/Qwen2.5-0.5B-Instruct/0/state.safetensors')
 
 state_final_norm = state_dict['state.final_norm'].to(torch.bfloat16)[0]
 model_lm_head = model_dict['model.embed_tokens.weight'].to(torch.bfloat16)

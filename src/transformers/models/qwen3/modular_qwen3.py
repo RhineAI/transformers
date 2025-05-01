@@ -60,7 +60,6 @@ class Qwen3MLP(GemmaMLP):
 class Qwen3Attention(LlamaAttention):
     def __init__(self, config: Qwen3Config, layer_idx: int):
         super().__init__(config, layer_idx)
-        print('ccc')
         self.q_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)  # unlike olmo, only on the head dim!
         self.k_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)  # thus post q_norm does not need reshape
         self.sliding_window = config.sliding_window

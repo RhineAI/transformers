@@ -3,6 +3,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from safetensors.torch import save_file
 import os
 
+from transformers.record.record_service import RecordService
+
 user_prompt = '直接给出最终答案，禁止出现原来的式子。36+12='
 messages = [
     {"role": "system", "content": 'You are a helpful assistant.'},
@@ -31,12 +33,13 @@ print(text.strip())
 inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
 print("[Inference]")
-record_dict = dict()
+record_service = RecordService()
+record_service.reset()
+
 generate_start = time.time()
 result = model(
     **inputs,
     pad_token_id=tokenizer.eos_token_id,
-    record_dict=record_dict
 )
 # print('result:', result)
 
@@ -46,9 +49,9 @@ print('next_token_id:', next_token_id)
 next_token = tokenizer.decode([next_token_id], skip_special_tokens=True)
 print('next_token:', next_token)
 
-print('\n[Record Dict]')
+print('\n[Record]')
 lines = []
-for k, v in record_dict.items():
+for k, v in record_service.state.items():
     lines.append(k + ': ' + str(list(v.shape)))
 print('.'.join(lines))
 # print('\n'.join(lines[:13]) + '\n\n...\n\n' + '\n'.join(lines[-15:]))
