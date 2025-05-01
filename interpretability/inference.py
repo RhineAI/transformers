@@ -1,8 +1,8 @@
 import time
+import sys
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextStreamer
 
-
-user_prompt = '直接给出最终答案，一个数字。16+28='
+user_prompt = '直接给出最终答案，禁止出现原来的式子。36+12='
 messages = [
     {"role": "system", "content": 'You are a helpful assistant.'},
     {"role": "user", "content": user_prompt}
@@ -11,7 +11,7 @@ messages = [
 start_time = time.time()
 print(f'[Initialize] Start at: {time.strftime("%H:%M:%S", time.localtime())}')
 
-model_path = "/data/disk1/guohaoran/models/Qwen2.5-0.5B-Instruct"
+model_path = "/data/disk1/guohaoran/models/Qwen3-0.6B"
 model = AutoModelForCausalLM.from_pretrained(
     model_path,
     device_map='cuda:0',
@@ -21,7 +21,8 @@ tokenizer = AutoTokenizer.from_pretrained(model_path)
 text = tokenizer.apply_chat_template(
     messages,
     tokenize=False,
-    add_generation_prompt=True
+    enable_thinking=False,
+    add_generation_prompt=True,
 )
 print('text:', text)
 inputs = tokenizer([text], return_tensors="pt").to(model.device)
@@ -52,4 +53,3 @@ tpm = total_new_tokens / (generate_duration / 60)
 print(f"\n[Status] Generation completed in {generate_duration:.2f}s")
 print(f"[Metric] TPM: {tpm:.0f} | Tokens: {total_new_tokens}")
 print(f"[Total] Duration: {time.time() - start_time:.2f}s")
-
