@@ -4,10 +4,10 @@ import numpy as np
 import cv2
 import os
 
-input_path = '/data/guohaoran/guohaoran/transformers/interpretability/record/3/state.safetensors'
-# input_path = '/data/guohaoran/guohaoran/models/Qwen2.5-0.5B-Instruct/model.safetensors'
-output_dir = '/data/guohaoran/guohaoran/transformers/interpretability/draw/output/state/3'
-# output_dir = '/data/guohaoran/guohaoran/transformers/interpretability/draw/output/model'
+# input_path = '/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0/state.safetensors'
+input_path = '/data/disk1/guohaoran/models/Qwen3-0.6B/model.safetensors'
+# output_dir = '/data/disk1/guohaoran/transformers/interpretability/draw/output/Qwen3-0.6B/state/0'
+output_dir = '/data/disk1/guohaoran/transformers/interpretability/draw/output/Qwen3-0.6B/model'
 
 color_mode = 'BLUE'
 
