@@ -593,6 +593,7 @@ class CohereModel(CoherePreTrainedModel):
         hidden_states = inputs_embeds
 
         # create position embeddings to be shared across the decoder layers
+        record_service.set("model.rotary_emb.input", hidden_states)
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
         # decoder layers
@@ -625,6 +626,7 @@ class CohereModel(CoherePreTrainedModel):
 
             layer_index += 1
 
+        record_service.set("model.norm.input", hidden_states)
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer

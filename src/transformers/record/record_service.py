@@ -17,4 +17,4 @@ class RecordService:
 
     def set(self, key, value):
         key = key.replace('LAYER_INDEX', str(self.current_layer_index))
-        self.state[key] = value
+        self.state[key] = value.clone().contiguous()

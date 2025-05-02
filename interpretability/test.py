@@ -53,10 +53,10 @@ print('\n[Record]')
 lines = []
 for k, v in record_service.state.items():
     lines.append(k + ': ' + str(list(v.shape)))
-print('\n'.join(lines))
-# print('\n'.join(lines[:13]) + '\n\n...\n\n' + '\n'.join(lines[-15:]))
-#
-# saved_path = '/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0'
-# os.makedirs(saved_path, exist_ok=True)
-# save_file(record_dict, os.path.join(saved_path, 'state.safetensors'))
-# print('\nSaved to:', saved_path)
+# print('\n'.join(lines))
+print('\n'.join(lines[:17]) + '\n\n...\n\n' + '\n'.join(lines[-15:]))
+
+saved_path = '/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0'
+os.makedirs(saved_path, exist_ok=True)
+save_file(record_service.state, os.path.join(saved_path, 'state.safetensors'))
+print('\nSaved to:', saved_path)

@@ -819,6 +819,9 @@ class GemmaForCausalLM(GemmaPreTrainedModel, GenerationMixin):
         >>> tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
         "What is your favorite condiment?"
         ```"""
+
+        record_service = RecordService()
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -841,7 +844,10 @@ class GemmaForCausalLM(GemmaPreTrainedModel, GenerationMixin):
         hidden_states = outputs.last_hidden_state
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
+
+        record_service.set("model.lm_head.input", hidden_states)
         logits = self.lm_head(hidden_states[:, slice_indices, :])
+        record_service.set("model.logits", logits)
 
         loss = None
         if labels is not None:

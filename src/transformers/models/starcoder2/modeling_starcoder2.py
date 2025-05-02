@@ -810,6 +810,9 @@ class Starcoder2ForCausalLM(Starcoder2PreTrainedModel, GenerationMixin):
         >>> tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
         "Hey, are you conscious? Can you talk to me?\nI'm not conscious, but I can talk to you."
         ```"""
+
+        record_service = RecordService()
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -832,7 +835,10 @@ class Starcoder2ForCausalLM(Starcoder2PreTrainedModel, GenerationMixin):
         hidden_states = outputs.last_hidden_state
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
+
+        record_service.set("model.lm_head.input", hidden_states)
         logits = self.lm_head(hidden_states[:, slice_indices, :])
+        record_service.set("model.logits", logits)
 
         loss = None
         if labels is not None:

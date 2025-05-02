@@ -1436,6 +1436,7 @@ class Emu3TextModel(Emu3PreTrainedModel):
         hidden_states = inputs_embeds
 
         # create position embeddings to be shared across the decoder layers
+        record_service.set("model.rotary_emb.input", hidden_states)
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
         # decoder layers
@@ -1468,6 +1469,7 @@ class Emu3TextModel(Emu3PreTrainedModel):
 
             layer_index += 1
 
+        record_service.set("model.norm.input", hidden_states)
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
@@ -1690,6 +1692,9 @@ class Emu3ForCausalLM(Emu3PreTrainedModel, GenerationMixin):
         >>> generated_ids = model.generate(**inputs, max_new_tokens=100, do_sample=False)
         >>> processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         ```"""
+
+        record_service = RecordService()
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1712,7 +1717,10 @@ class Emu3ForCausalLM(Emu3PreTrainedModel, GenerationMixin):
         hidden_states = outputs.last_hidden_state
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
+
+        record_service.set("model.lm_head.input", hidden_states)
         logits = self.lm_head(hidden_states[:, slice_indices, :])
+        record_service.set("model.logits", logits)
 
         loss = None
         if labels is not None:

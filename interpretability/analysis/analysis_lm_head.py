@@ -1,38 +1,34 @@
 import torch
 from safetensors.torch import load_file
 
-model_dict = load_file('/data/disk1/guohaoran/models/Qwen2.5-0.5B-Instruct/model.safetensors')
-state_dict = load_file('/data/disk1/guohaoran/transformers/interpretability/record/Qwen2.5-0.5B-Instruct/0/state.safetensors')
+model_dict = load_file('/data/disk1/guohaoran/models/Qwen3-0.6B/model.safetensors')
+state_dict = load_file('/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0/state.safetensors')
 
-state_final_norm = state_dict['state.final_norm'].to(torch.bfloat16)[0]
-model_lm_head = model_dict['model.embed_tokens.weight'].to(torch.bfloat16)
-state_logits = state_dict['state.logits'].to(torch.bfloat16)[0]
-state_last_logit = state_dict['state.last_logits'].to(torch.bfloat16)
+lm_head_input = state_dict['model.lm_head.input'].to(torch.bfloat16)[0]
+lm_head_weight = model_dict['model.embed_tokens.weight'].to(torch.bfloat16)
+state_logits = state_dict['model.logits'].to(torch.bfloat16)[0]
 
-print('state_final_norm:', list(state_final_norm.shape))  # [33, 896]
-print('model_lm_head:', list(model_lm_head.shape))  # [151936, 896]
-print('state_logits:', list(state_logits.shape))  # [33, 151936]
-print('state_last_logit:', list(state_last_logit.shape))  # [151936]
+print('state_final_norm:', list(lm_head_input.shape))  # [40, 1024]
+print('model_lm_head:', list(lm_head_weight.shape))  # [151936, 1024]
+print('state_logits:', list(state_logits.shape))  # [40, 151936]
 
-l = state_final_norm.shape[0]
+l = lm_head_input.shape[0]
 
-logits = state_final_norm @ model_lm_head.T   # shape: [33, 896] · [896, 151936] = [33, 151936]
+logits = lm_head_input @ lm_head_weight.T   # shape: [40, 1024] · [1024, 151936] = [40, 151936]
 
-
-# import output index: [33, 19]
 
 max_value, max_index = torch.max(logits[-1], dim=-1)
 k = max_index.item()
 print(f"\nMaximum token index: {k},  Value: {max_value.item()}\n")
 
 
-state_final_norm_k = state_final_norm[k]
-model_lm_head_last = model_lm_head[-1]
+lm_head_input_k = lm_head_input[k]
+lm_head_weight_last = lm_head_weight[-1]
 
-print('state_final_norm_k:', list(state_final_norm_k.shape))  # [896]
-print('model_lm_head_last:', list(model_lm_head_last.shape))  # [896]
+print('state_final_norm_k:', list(lm_head_input_k.shape))  # [1024]
+print('model_lm_head_last:', list(lm_head_weight_last.shape))  # [1024]
 
-elementwise_product = state_final_norm_k * model_lm_head_last
+elementwise_product = lm_head_input_k * lm_head_weight_last
 # print(elementwise_product)
 
 
