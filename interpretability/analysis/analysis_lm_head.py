@@ -11,7 +11,7 @@ ANALYSIS_NUM = 5
 ANALYSIS_MIN_P = 1e-2
 
 DRAW_MODE = True
-OUTPUT_DIR = '/data/disk1/guohaoran/transformers/interpretability/analysis/output/0-28/lm_head/'
+OUTPUT_DIR = '/data/disk1/guohaoran/transformers/interpretability/analysis/output/0/lm_head/'
 
 model_dict = load_file('/data/disk1/guohaoran/models/Qwen3-0.6B/model.safetensors')
 state_dict = load_file('/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0/state.safetensors')
@@ -38,8 +38,7 @@ max_value, max_index = torch.max(logits[-1], dim=-1)
 print(f"\nMaximum token    index: {max_index.item()}  value: {max_value.item()}")
 
 importance = torch.zeros_like(logits)  # shape like logits: [40, 151936]
-# importance[-1, max_index] = 1
-importance[-1, 28] = 1
+importance[-1, max_index] = 1
 
 
 importance_input = torch.zeros_like(lm_head_input)
