@@ -1,6 +1,6 @@
 import torch
 from safetensors.torch import load_file
-from draw import draw
+from draw import draw, draw_elementwise, info
 
 torch.set_printoptions(
     threshold=float('inf'),
@@ -10,8 +10,8 @@ torch.set_printoptions(
 ANALYSIS_NUM = 5
 ANALYSIS_MIN_P = 1e-2
 
-DRAW_MODE = False
-OUTPUT_DIR = '/data/disk1/guohaoran/transformers/interpretability/analysis/output/0/lm_head/'
+DRAW_MODE = True
+OUTPUT_DIR = '/data/disk1/guohaoran/transformers/interpretability/analysis/output/0-28/lm_head/'
 
 model_dict = load_file('/data/disk1/guohaoran/models/Qwen3-0.6B/model.safetensors')
 state_dict = load_file('/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0/state.safetensors')
@@ -24,13 +24,22 @@ print('lm_head_input:', list(lm_head_input.shape))  # [40, 1024]
 print('lm_head_weight:', list(lm_head_weight.shape))  # [1024, 151936]
 print('storage_logits:', list(storage_logits.shape))  # [40, 151936]
 
+if DRAW_MODE:
+    draw(lm_head_input, OUTPUT_DIR + 'state/input.jpg', 'GREEN')
+    info(lm_head_input, OUTPUT_DIR + 'state/input.txt', 'lm_head input state')
+    draw(lm_head_weight, OUTPUT_DIR + 'state/weight.jpg', 'BLUE')
+    info(lm_head_weight, OUTPUT_DIR + 'state/weight.txt', 'lm_head weight state')
+    draw(storage_logits, OUTPUT_DIR + 'state/output.jpg', 'GREEN')
+    info(storage_logits, OUTPUT_DIR + 'state/output.txt', 'lm_head output state')
+
 logits = lm_head_input @ lm_head_weight   # shape: [40, 1024] · [1024, 151936] = [40, 151936]
 
 max_value, max_index = torch.max(logits[-1], dim=-1)
 print(f"\nMaximum token    index: {max_index.item()}  value: {max_value.item()}")
 
 importance = torch.zeros_like(logits)  # shape like logits: [40, 151936]
-importance[-1, max_index] = 1
+# importance[-1, max_index] = 1
+importance[-1, 28] = 1
 
 
 importance_input = torch.zeros_like(lm_head_input)
@@ -50,16 +59,6 @@ for i in range(top_position_list.shape[0]):
     input_line = lm_head_input[row]
     weight_line = lm_head_weight[:, col]
     elementwise = input_line * weight_line
-    print('Elementwise detail info (0~30 of 1024)')
-    top5 = torch.topk(input_line, 5).values.tolist()
-    print(f'\ninput_line:      top5 {top5}')
-    print(input_line[:30])
-    top5 = torch.topk(weight_line, 5).values.tolist()
-    print(f'\nweight_line:      top5 {top5}')
-    print(weight_line[:30])
-    top5 = torch.topk(elementwise, 5).values.tolist()
-    print(f'\nelementwise:      top5 {top5}')
-    print(elementwise[:30])
 
     elementwise_compare = torch.stack([input_line, weight_line, elementwise])
 
@@ -67,9 +66,12 @@ for i in range(top_position_list.shape[0]):
     importance_weight[:, col] += elementwise * v
 
     if DRAW_MODE:
-        draw(elementwise_compare, OUTPUT_DIR + f'elementwise_{i}.jpg', 'BLUE')
+        draw_elementwise(elementwise_compare, OUTPUT_DIR + f'elementwise/{i}.jpg', 'BLUE')
 
 if DRAW_MODE:
-    draw(importance, OUTPUT_DIR + 'output.jpg', 'GREEN')
-    draw(importance_weight, OUTPUT_DIR + 'weight.jpg', 'BLUE')
-    draw(importance_input, OUTPUT_DIR + 'input.jpg', 'GREEN')
+    draw(importance, OUTPUT_DIR + 'importance/output.jpg', 'GREEN')
+    info(importance, OUTPUT_DIR + 'importance/output.txt', 'lm_head output importance')
+    draw(importance_weight, OUTPUT_DIR + 'importance/weight.jpg', 'BLUE')
+    info(importance_weight, OUTPUT_DIR + 'importance/weight.txt', 'lm_head weight importance')
+    draw(importance_input, OUTPUT_DIR + 'importance/input.jpg', 'GREEN')
+    info(importance_input, OUTPUT_DIR + 'importance/input.txt', 'lm_head input importance')

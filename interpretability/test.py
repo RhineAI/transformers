@@ -49,6 +49,11 @@ print('next_token_id:', next_token_id)
 next_token = tokenizer.decode([next_token_id], skip_special_tokens=True)
 print('next_token:', next_token)
 
+next_token_20 = tokenizer.decode([20], skip_special_tokens=True)
+next_token_10 = tokenizer.decode([10], skip_special_tokens=True)
+print('\ntoken_id:', 20, 'token:', next_token_20)
+print('token_id:', 10, 'token:', next_token_10)
+
 print('\n[Record]')
 lines = []
 for k, v in record_service.state.items():
