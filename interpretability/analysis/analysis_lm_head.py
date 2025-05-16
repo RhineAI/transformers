@@ -34,13 +34,13 @@ if DRAW_MODE:
 
 logits = lm_head_input @ lm_head_weight   # shape: [40, 1024] · [1024, 151936] = [40, 151936]
 
+# Only for last layer calculate the correct token for importance 1 other 0
+importance = torch.zeros_like(logits)  # shape like logits: [40, 151936]
 max_value, max_index = torch.max(logits[-1], dim=-1)
 print(f"\nMaximum token    index: {max_index.item()}  value: {max_value.item()}")
-
-importance = torch.zeros_like(logits)  # shape like logits: [40, 151936]
 importance[-1, max_index] = 1
 
-
+# Analysis input and weight importance
 importance_input = torch.zeros_like(lm_head_input)
 importance_weight = torch.zeros_like(lm_head_weight)
 
@@ -49,8 +49,8 @@ rn = importance.size(1)
 top_position_list = torch.stack((indices // rn, indices % rn), dim=1)
 
 for i in range(top_position_list.shape[0]):
-    row, col = top_position_list[i]
-    v = importance[row, col]
+    row, col = top_position_list[i]  # 激活值
+    v = importance[row, col]  # current
     if v < ANALYSIS_MIN_P:
         break
     print(f"\nTop {i}    position: [{row.item()}/{importance.shape[0]-1}, {col.item()}/{importance.shape[1]-1}]  value: {v}\n")
