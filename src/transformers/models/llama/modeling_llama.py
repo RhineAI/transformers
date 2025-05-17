@@ -172,6 +172,8 @@ class LlamaMLP(nn.Module):
         self.act_fn = ACT2FN[config.hidden_act]
 
     def forward(self, x):
+        # down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+
         record_service = RecordService()
         record_service.set('model.layers.LAYER_INDEX.mlp.input', x)
         pre = self.gate_proj(x)
@@ -351,8 +353,7 @@ class LlamaDecoderLayer(GradientCheckpointingLayer):
             position_embeddings=position_embeddings,
             **kwargs,
         )
-        record_service.set('model.layers.LAYER_INDEX.residual.0.input.residual', hidden_states)
-        record_service.set('model.layers.LAYER_INDEX.residual.0.input.hidden_states', hidden_states)
+        record_service.set('model.layers.LAYER_INDEX.residual.0.input', hidden_states)
         hidden_states = residual + hidden_states
 
         # Fully Connected
@@ -360,8 +361,7 @@ class LlamaDecoderLayer(GradientCheckpointingLayer):
         record_service.set('model.layers.LAYER_INDEX.post_attention_layernorm.input', hidden_states)
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
-        record_service.set('model.layers.LAYER_INDEX.residual.1.input.residual', hidden_states)
-        record_service.set('model.layers.LAYER_INDEX.residual.1.input.hidden_states', hidden_states)
+        record_service.set('model.layers.LAYER_INDEX.residual.1.input', hidden_states)
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)

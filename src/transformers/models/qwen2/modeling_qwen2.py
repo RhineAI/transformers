@@ -291,8 +291,7 @@ class Qwen2DecoderLayer(GradientCheckpointingLayer):
             position_embeddings=position_embeddings,
             **kwargs,
         )
-        record_service.set("model.layers.LAYER_INDEX.residual.0.input.residual", hidden_states)
-        record_service.set("model.layers.LAYER_INDEX.residual.0.input.hidden_states", hidden_states)
+        record_service.set("model.layers.LAYER_INDEX.residual.0.input", hidden_states)
         hidden_states = residual + hidden_states
 
         # Fully Connected
@@ -300,8 +299,7 @@ class Qwen2DecoderLayer(GradientCheckpointingLayer):
         record_service.set("model.layers.LAYER_INDEX.post_attention_layernorm.input", hidden_states)
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
-        record_service.set("model.layers.LAYER_INDEX.residual.1.input.residual", hidden_states)
-        record_service.set("model.layers.LAYER_INDEX.residual.1.input.hidden_states", hidden_states)
+        record_service.set("model.layers.LAYER_INDEX.residual.1.input", hidden_states)
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
