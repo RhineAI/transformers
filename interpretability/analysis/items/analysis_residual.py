@@ -1,7 +1,7 @@
 import torch
 import os
 from safetensors.torch import load_file, save_file
-from draw import draw, draw_elementwise, info
+from ..utils.draw import draw, draw_elementwise, info
 
 
 torch.set_printoptions(threshold=float('inf'), sci_mode=False)
@@ -18,7 +18,7 @@ MODEL_DICT_PATH = '/data/disk1/guohaoran/models/Qwen3-0.6B/model.safetensors'
 STATE_DICT_PATH = '/data/disk1/guohaoran/transformers/interpretability/record/Qwen3-0.6B/0/state.safetensors'
 
 
-def analysis_lm_head(input, weight, output):
+def analysis_residual(importance_output, input, weight, output):
     print('lm_head_input:', list(input.shape))  # [40, 1024]
     print('lm_head_weight:', list(weight.shape))  # [1024, 151936]
     print('lm_head_output:', list(output.shape))  # [40, 151936]
@@ -32,12 +32,13 @@ def analysis_lm_head(input, weight, output):
         info(output, OUTPUT_DIR + 'state/output.txt', 'lm_head output state')
     
     logits = input @ weight   # shape: [40, 1024] · [1024, 151936] = [40, 151936]
-    
+
     # Only for last layer calculate the correct token for importance 1 other 0
-    importance_output = torch.zeros_like(logits)  # shape like logits: [40, 151936]
-    max_value, max_index = torch.max(logits[-1], dim=-1)
-    print(f"\nMaximum token    index: {max_index.item()}  value: {max_value.item()}")
-    importance_output[-1, max_index] = 1
+    if importance_output is None:
+        importance_output = torch.zeros_like(logits)  # shape like logits: [40, 151936]
+        max_value, max_index = torch.max(logits[-1], dim=-1)
+        print(f"\nMaximum token    index: {max_index.item()}  value: {max_value.item()}")
+        importance_output[-1, max_index] = 1
     
     # Analysis input and weight importance
     importance_input = torch.zeros_like(input)
@@ -75,6 +76,8 @@ def analysis_lm_head(input, weight, output):
         info(importance_weight, OUTPUT_DIR + 'importance/weight.txt', 'lm_head weight importance')
         draw(importance_input, OUTPUT_DIR + 'importance/input.jpg', 'GREEN')
         info(importance_input, OUTPUT_DIR + 'importance/input.txt', 'lm_head input importance')
+
+    return importance_input, importance_weight
     
 
 if __name__ == '__main__':
@@ -85,7 +88,7 @@ if __name__ == '__main__':
     lm_head_weight = model_dict['model.embed_tokens.weight'].to(torch.bfloat16).T
     lm_head_output = state_dict['model.logits'].to(torch.bfloat16)[0]
     
-    importance_input, importance_weight = analysis_lm_head(lm_head_input, lm_head_weight, lm_head_output)
+    importance_input, importance_weight = analysis_lm_head(None, lm_head_input, lm_head_weight, lm_head_output)
       
     importance_dict = {
         'model.lm_head.input': importance_input.contiguous(),
